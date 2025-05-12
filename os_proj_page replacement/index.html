@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Page Replacement Algorithms</title>
+  <style>
+    body { font-family: Arial; margin: 20px; }
+    input, select, button { margin: 5px 0; padding: 5px; }
+    table, th, td { border: 1px solid #ccc; border-collapse: collapse; padding: 8px; }
+  </style>
+  <link rel="stylesheet" href="style.css">
+
+  
+</head>
+<body>
+  <body>
+    <div class="container">
+      <h2>Page Replacement Simulator</h2>
+  
+      <div class="form-group">
+        <label>Page Reference String (space-separated):</label>
+        <input type="text" id="pages" value="7 0 1 2 0 3 0 4 2 3 0 3 2">
+      </div>
+  
+      <div class="form-group">
+        <label>Number of Frames:</label>
+        <input type="number" id="frames" value="3">
+      </div>
+  
+      <div class="form-group">
+        <label>Algorithm:</label>
+        <select id="algorithm">
+          <option value="fifo">FIFO</option>
+          <option value="lru">LRU</option>
+          <option value="optimal">Optimal</option>
+        </select>
+      </div>
+  
+      <button onclick="run()">Run Algorithm</button>
+  
+      <h3 id="faults">Total Page Faults: </h3>
+  
+      <table id="resultTable">
+        <thead>
+          <tr><th>Step</th><th>Memory State</th></tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </body>
+  
+
+  <script>
+    function fifo(pages, frames) {
+      const queue = [];
+      const result = [];
+      let faults = 0;
+
+      pages.forEach(page => {
+        if (!queue.includes(page)) {
+          if (queue.length === frames) queue.shift();
+          queue.push(page);
+          faults++;
+        }
+        result.push([...queue]);
+      });
+
+      return { result, faults };
+    }
+
+    function lru(pages, frames) {
+      const stack = [];
+      const result = [];
+      let faults = 0;
+
+      pages.forEach(page => {
+        const index = stack.indexOf(page);
+        if (index !== -1) {
+          stack.splice(index, 1);
+        } else {
+          if (stack.length === frames) stack.shift();
+          faults++;
+        }
+        stack.push(page);
+        result.push([...stack]);
+      });
+
+      return { result, faults };
+    }
+
+    function optimal(pages, frames) {
+      const memory = [];
+      const result = [];
+      let faults = 0;
+
+      pages.forEach((page, i) => {
+        if (!memory.includes(page)) {
+          if (memory.length === frames) {
+            const future = pages.slice(i + 1);
+            const indices = memory.map(p => {
+              const idx = future.indexOf(p);
+              return idx === -1 ? Infinity : idx;
+            });
+            const replaceIdx = indices.indexOf(Math.max(...indices));
+            memory[replaceIdx] = page;
+          } else {
+            memory.push(page);
+          }
+          faults++;
+        }
+        result.push([...memory]);
+      });
+
+      return { result, faults };
+    }
+
+    function run() {
+      const pageInput = document.getElementById("pages").value.trim();
+      const pages = pageInput.split(/\s+/).map(Number);
+      const frames = parseInt(document.getElementById("frames").value);
+      const algo = document.getElementById("algorithm").value;
+
+      let output;
+      if (algo === "fifo") output = fifo(pages, frames);
+      else if (algo === "lru") output = lru(pages, frames);
+      else if (algo === "optimal") output = optimal(pages, frames);
+
+      document.getElementById("faults").innerText = "Total Page Faults: " + output.faults;
+
+      const tableBody = document.querySelector("#resultTable tbody");
+      tableBody.innerHTML = "";
+      output.result.forEach((state, i) => {
+        const row = document.createElement("tr");
+        const step = document.createElement("td");
+        const memory = document.createElement("td");
+        step.innerText = i + 1;
+        memory.innerText = state.join(", ");
+        row.appendChild(step);
+        row.appendChild(memory);
+        tableBody.appendChild(row);
+      });
+    }
+  </script>
+</body>
+</html>
