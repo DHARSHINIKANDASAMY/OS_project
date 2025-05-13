@@ -1,144 +1,264 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>Page Replacement Algorithms</title>
+  <title>Perfect Page Replacement Simulator</title>
   <style>
-    body { font-family: Arial; margin: 20px; }
-    input, select, button { margin: 5px 0; padding: 5px; }
-    table, th, td { border: 1px solid #ccc; border-collapse: collapse; padding: 8px; }
+    body { font-family: Arial, sans-serif; margin: 20px; }
+    input, select, button { padding: 8px; margin: 5px 0; }
+    table { border-collapse: collapse; width: 80%; margin-top: 20px; }
+    th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+    th { background-color: #f2f2f2; }
+    .container { max-width: 900px; margin: 0 auto; }
+    .form-group { margin-bottom: 15px; }
+    .hit { background-color: #d4edda; }
+    .fault { background-color: #f8d7da; }
   </style>
   <link rel="stylesheet" href="style.css">
-
-  
 </head>
 <body>
-  <body>
-    <div class="container">
-      <h2>Page Replacement Simulator</h2>
-  
-      <div class="form-group">
-        <label>Page Reference String (space-separated):</label>
-        <input type="text" id="pages" value="7 0 1 2 0 3 0 4 2 3 0 3 2">
-      </div>
-  
-      <div class="form-group">
-        <label>Number of Frames:</label>
-        <input type="number" id="frames" value="3">
-      </div>
-  
-      <div class="form-group">
-        <label>Algorithm:</label>
-        <select id="algorithm">
-          <option value="fifo">FIFO</option>
-          <option value="lru">LRU</option>
-          <option value="optimal">Optimal</option>
-        </select>
-      </div>
-  
-      <button onclick="run()">Run Algorithm</button>
-  
-      <h3 id="faults">Total Page Faults: </h3>
-  
-      <table id="resultTable">
-        <thead>
-          <tr><th>Step</th><th>Memory State</th></tr>
-        </thead>
-        <tbody></tbody>
-      </table>
+  <div class="container">
+    <h2>Page Replacement Simulator </h2>
+    
+    <div class="form-group">
+      <label>Page Reference String:</label>
+      <input type="text" id="pages" value="7 0 1 2 0 3 0 4 2 3 0 3 2" size="40">
     </div>
-  </body>
-  
+    
+    <div class="form-group">
+      <label>Number of Frames:</label>
+      <input type="number" id="frames" value="3" min="1">
+    </div>
+    
+    <div class="form-group">
+      <label>Algorithm:</label>
+      <select id="algorithm">
+        <option value="fifo">FIFO</option>
+        <option value="lru">LRU</option>
+        <option value="optimal">Optimal</option>
+      </select>
+    </div>
+    
+    <button onclick="runAlgorithm()">Run Algorithm</button>
+    
+    <h3 id="stats">Total Page Faults: 0 | Total Hits: 0</h3>
+    
+    <table id="resultTable">
+      <thead>
+        <tr><th>Step</th><th>Page</th><th>Memory State</th><th>Status</th></tr>
+      </thead>
+      <tbody></tbody>
+    </table>
+  </div>
 
   <script>
-    function fifo(pages, frames) {
-      const queue = [];
+    // FIFO implementation with hit tracking
+    function runFIFO(pages, frameCount) {
+      const memory = [];
+      const queue = []; // Tracks loading order
       const result = [];
       let faults = 0;
+      let hits = 0;
 
-      pages.forEach(page => {
-        if (!queue.includes(page)) {
-          if (queue.length === frames) queue.shift();
-          queue.push(page);
+      for (let i = 0; i < pages.length; i++) {
+        const page = pages[i];
+        let status = "";
+        
+        if (!memory.includes(page)) {
           faults++;
-        }
-        result.push([...queue]);
-      });
-
-      return { result, faults };
-    }
-
-    function lru(pages, frames) {
-      const stack = [];
-      const result = [];
-      let faults = 0;
-
-      pages.forEach(page => {
-        const index = stack.indexOf(page);
-        if (index !== -1) {
-          stack.splice(index, 1);
+          status = "Fault";
+          
+          if (memory.length < frameCount) {
+            memory.push(page);
+            queue.push(page);
+          } else {
+            // Remove oldest page (first in queue)
+            const oldest = queue.shift();
+            const index = memory.indexOf(oldest);
+            memory[index] = page;
+            queue.push(page);
+          }
         } else {
-          if (stack.length === frames) stack.shift();
-          faults++;
+          hits++;
+          status = "Hit";
         }
-        stack.push(page);
-        result.push([...stack]);
-      });
+        
+        // Record state for display
+        result.push({
+          page,
+          memory: [...memory],
+          status
+        });
+      }
 
-      return { result, faults };
+      return { result, faults, hits };
     }
 
-    function optimal(pages, frames) {
+    // LRU implementation with hit tracking
+    function runLRU(pages, frameCount) {
+      const memory = [];
+      const lastUsed = new Map(); // Tracks last used time
+      const result = [];
+      let faults = 0;
+      let hits = 0;
+      let clock = 0;
+
+      for (const page of pages) {
+        clock++;
+        let status = "";
+        
+        if (!memory.includes(page)) {
+          faults++;
+          status = "Fault";
+          
+          if (memory.length < frameCount) {
+            memory.push(page);
+          } else {
+            // Find LRU page
+            let lruPage = null;
+            let oldestTime = Infinity;
+            
+            for (const memPage of memory) {
+              if (lastUsed.get(memPage) < oldestTime) {
+                oldestTime = lastUsed.get(memPage);
+                lruPage = memPage;
+              }
+            }
+            
+            // Replace LRU page
+            const index = memory.indexOf(lruPage);
+            memory[index] = page;
+          }
+        } else {
+          hits++;
+          status = "Hit";
+        }
+        
+        // Update last used time
+        lastUsed.set(page, clock);
+        result.push({
+          page,
+          memory: [...memory],
+          status
+        });
+      }
+
+      return { result, faults, hits };
+    }
+
+    // Optimal implementation with hit tracking
+    function runOptimal(pages, frameCount) {
       const memory = [];
       const result = [];
       let faults = 0;
+      let hits = 0;
 
-      pages.forEach((page, i) => {
+      for (let i = 0; i < pages.length; i++) {
+        const page = pages[i];
+        let status = "";
+        
         if (!memory.includes(page)) {
-          if (memory.length === frames) {
-            const future = pages.slice(i + 1);
-            const indices = memory.map(p => {
-              const idx = future.indexOf(p);
-              return idx === -1 ? Infinity : idx;
-            });
-            const replaceIdx = indices.indexOf(Math.max(...indices));
-            memory[replaceIdx] = page;
-          } else {
-            memory.push(page);
-          }
           faults++;
+          status = "Fault";
+          
+          if (memory.length < frameCount) {
+            memory.push(page);
+          } else {
+            // Find page not needed for longest time
+            let farthest = -1;
+            let replaceIndex = 0;
+            
+            for (let j = 0; j < memory.length; j++) {
+              const nextUse = pages.slice(i + 1).indexOf(memory[j]);
+              if (nextUse === -1) {
+                replaceIndex = j;
+                break;
+              }
+              if (nextUse > farthest) {
+                farthest = nextUse;
+                replaceIndex = j;
+              }
+            }
+            
+            memory[replaceIndex] = page;
+          }
+        } else {
+          hits++;
+          status = "Hit";
         }
-        result.push([...memory]);
-      });
+        
+        result.push({
+          page,
+          memory: [...memory],
+          status
+        });
+      }
 
-      return { result, faults };
+      return { result, faults, hits };
     }
 
-    function run() {
-      const pageInput = document.getElementById("pages").value.trim();
-      const pages = pageInput.split(/\s+/).map(Number);
-      const frames = parseInt(document.getElementById("frames").value);
-      const algo = document.getElementById("algorithm").value;
+    function runAlgorithm() {
+  // Get input values
+  const pages = document.getElementById("pages").value.trim().split(/\s+/).map(Number);
+  const frameCount = parseInt(document.getElementById("frames").value);
+  const algorithm = document.getElementById("algorithm").value;
+  
+  // Validate input
+  if (pages.some(isNaN) || isNaN(frameCount) || frameCount < 1) {
+    alert("Please enter valid page numbers and frame count");
+    return;
+  }
+  
+  // Run selected algorithm
+  let output;
+  switch (algorithm) {
+    case "fifo": 
+      output = runFIFO(pages, frameCount);
+      break;
+    case "lru": 
+      output = runLRU(pages, frameCount);
+      break;
+    case "optimal": 
+      output = runOptimal(pages, frameCount);
+      break;
+    default: 
+      alert("Invalid algorithm"); 
+      return;
+  }
+  
+  // Display results
+  document.getElementById("stats").textContent = 
+    `Total Page Faults: ${output.faults} | Total Hits: ${output.hits}`;
+  
+  const tableBody = document.querySelector("#resultTable tbody");
+  tableBody.innerHTML = "";  // Clear previous results
 
-      let output;
-      if (algo === "fifo") output = fifo(pages, frames);
-      else if (algo === "lru") output = lru(pages, frames);
-      else if (algo === "optimal") output = optimal(pages, frames);
+  output.result.forEach((step, index) => {
+    const row = document.createElement("tr");
+    const stepCell = document.createElement("td");
+    const pageCell = document.createElement("td");
+    const memoryCell = document.createElement("td");
+    const statusCell = document.createElement("td");
 
-      document.getElementById("faults").innerText = "Total Page Faults: " + output.faults;
+    stepCell.textContent = index + 1;
+    pageCell.textContent = step.page;
+    memoryCell.textContent = step.memory.join(", ");
+    statusCell.textContent = step.status;
 
-      const tableBody = document.querySelector("#resultTable tbody");
-      tableBody.innerHTML = "";
-      output.result.forEach((state, i) => {
-        const row = document.createElement("tr");
-        const step = document.createElement("td");
-        const memory = document.createElement("td");
-        step.innerText = i + 1;
-        memory.innerText = state.join(", ");
-        row.appendChild(step);
-        row.appendChild(memory);
-        tableBody.appendChild(row);
-      });
+    // Add coloring based on hit/fault
+    if (step.status === "Hit") {
+      row.classList.add("hit");
+    } else {
+      row.classList.add("fault");
     }
+
+    row.appendChild(stepCell);
+    row.appendChild(pageCell);
+    row.appendChild(memoryCell);
+    row.appendChild(statusCell);
+    tableBody.appendChild(row);
+  });
+}
+
   </script>
 </body>
 </html>
