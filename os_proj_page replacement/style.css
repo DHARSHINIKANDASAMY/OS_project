@@ -13,7 +13,7 @@ body {
     padding: 30px;
     border-radius: 12px;
     box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
-    width: 90%;
+    width: 80%;
     max-width: 500px;
   }
   
@@ -73,7 +73,7 @@ body {
   
   th, td {
     border: 1px solid #ddd;
-    padding: 8px 12px;
+    padding: 9px 13px;
     text-align: center;
   }
   
